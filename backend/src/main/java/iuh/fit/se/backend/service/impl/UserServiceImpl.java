@@ -4,7 +4,9 @@ import iuh.fit.se.backend.dto.UserProfileDto;
 import iuh.fit.se.backend.dto.auth.UserCreateRequest;
 import iuh.fit.se.backend.dto.auth.UserCreateResponse;
 import iuh.fit.se.backend.model.Gender;
+import iuh.fit.se.backend.model.Role;
 import iuh.fit.se.backend.model.User;
+import iuh.fit.se.backend.repository.RoleRepository;
 import iuh.fit.se.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -13,24 +15,32 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements iuh.fit.se.backend.service.UserService {
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
 
     @Override
     public UserCreateResponse createUser(UserCreateRequest request) {
-        if(userRepository.existsByEmail(request.getEmail())) {
+        if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email already exists");
         }
 
         PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
+        Set<Role> roles = resolveRoles(request.getRoles());
+
         User user = User.builder()
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .phoneNumber(request.getPhoneNumber())
+                .roles(roles)
                 .build();
 
         userRepository.save(user);
@@ -97,6 +107,11 @@ public class UserServiceImpl implements iuh.fit.se.backend.service.UserService {
         existing.setDob(userDto.getDob());
         existing.setPhotoUrl(userDto.getPhotoUrl());
 
+        if (userDto.getRoles() != null && !userDto.getRoles().isEmpty()) {
+            Set<Role> roles = roleRepository.findByNameIn(userDto.getRoles());
+            existing.setRoles(roles);
+        }
+
         userRepository.save(existing);
         return convertToProfileDto(existing);
     }
@@ -127,7 +142,9 @@ public class UserServiceImpl implements iuh.fit.se.backend.service.UserService {
         existing.setFirstName(user.getFirstName());
         existing.setLastName(user.getLastName());
         existing.setPhoneNumber(user.getPhoneNumber());
-        existing.setRole(user.getRole());
+        if (user.getRoles() != null && !user.getRoles().isEmpty()) {
+            existing.setRoles(user.getRoles());
+        }
         return userRepository.save(existing);
     }
 
@@ -141,7 +158,28 @@ public class UserServiceImpl implements iuh.fit.se.backend.service.UserService {
                 .gender(user.getGender() != null ? user.getGender().name() : null)
                 .dob(user.getDob())
                 .photoUrl(user.getPhotoUrl())
-                .role(user.getRole() != null ? user.getRole().name() : null)
+                .roles(user.getRoles() != null
+                        ? user.getRoles().stream().map(Role::getName).collect(Collectors.toSet())
+                        : null)
                 .build();
+    }
+
+    private Set<Role> resolveRoles(Set<String> roleNames) {
+        Set<String> normalized = roleNames == null || roleNames.isEmpty()
+                ? Set.of("CUSTOMER")
+                : roleNames.stream()
+                .filter(name -> name != null && !name.isBlank())
+                .map(name -> name.replace("ROLE_", "").toUpperCase())
+                .collect(Collectors.toSet());
+
+        if (normalized.isEmpty()) {
+            normalized = Set.of("CUSTOMER");
+        }
+
+        Set<Role> roles = roleRepository.findByNameIn(normalized);
+        if (roles.size() != normalized.size()) {
+            throw new RuntimeException("Invalid role provided");
+        }
+        return roles;
     }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Form, Input, Button, Card, Typography, message, Spin } from 'antd';
 import { UserOutlined, MailOutlined, PhoneOutlined } from '@ant-design/icons';
 import { getProfile, updateProfile } from '../api/userAPI';
@@ -11,28 +11,28 @@ export default function Profile() {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
 
-    useEffect(() => {
-        loadProfile();
-    }, []);
-
-    const loadProfile = async () => {
+    const loadProfile = useCallback(async () => {
         try {
             setLoading(true);
             const profile = await getProfile();
             form.setFieldsValue(profile);
-        } catch (error) {
+        } catch {
             message.error('Không thể tải thông tin hồ sơ!');
         } finally {
             setLoading(false);
         }
-    };
+    }, [form]);
+
+    useEffect(() => {
+        loadProfile();
+    }, [loadProfile]);
 
     const onFinish = async (values: UserProfileDto) => {
         try {
             setSaving(true);
             await updateProfile(values);
             message.success('Cập nhật hồ sơ thành công!');
-        } catch (error) {
+        } catch {
             message.error('Cập nhật thất bại!');
         } finally {
             setSaving(false);

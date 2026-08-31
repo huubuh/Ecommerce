@@ -44,12 +44,14 @@ public class SecurityConfig {
                                 "/api/products/search",
                                 "/api/categories",
                                 "/api/categories/{id}",
-                                "/api/categories/*/products"
+                                "/api/categories/*/products",
+                                "/api/payments/vnpay/**"
                         ).permitAll()
 
                         .requestMatchers(
                                 "/api/auth/**",
-                                "/api/session-cart/**"
+                                "/api/session-cart/**",
+                                "/api/contact"
                         ).permitAll()
 
                         // ===== ADMIN =====
@@ -62,6 +64,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasRole("ADMIN")
 
                         // ===== AUTHENTICATED USER =====
+                        .requestMatchers(HttpMethod.POST, "/api/ai/chat").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/ai/conversations/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/ai/conversations/**").authenticated()
                         .requestMatchers(
                                 "/api/cart/**",
                                 "/api/orders/**",

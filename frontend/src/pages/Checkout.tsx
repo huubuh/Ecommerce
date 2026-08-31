@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Row, Col, Typography, Card, Button, Spin, message, Divider, Radio, Space, Table, Tag } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import useCart from '../hooks/useCart';
 import { fetchAddresses } from '../api/addressAPI';
 import { checkout as checkoutAPI } from '../api/cartAPI';
@@ -52,7 +52,7 @@ function PaymentSelector({ value, onChange }: { value: PaymentMethod, onChange: 
         <Radio.Group onChange={e => onChange(e.target.value)} value={value}>
             <Space orientation="vertical">
                 <Radio value="CASH">Tiền mặt</Radio>
-                <Radio value="CARD">Thẻ</Radio>
+                <Radio value="VNPAY">Thanh toán VNPay</Radio>
             </Space>
         </Radio.Group>
     );
@@ -85,22 +85,35 @@ export default function Checkout() {
                 message.error('Không thể tải địa chỉ!');
             }
         })();
-    }, [user]);
+    }, [user, navigate]);
 
-    const handleCheckout = async () => {
-        if (!selectedAddressId) return;
+        const handleCheckout = async () => {
+        if (!selectedAddressId) {
+            return;
+        }
+
         try {
             setLoading(true);
-            const order = await checkoutAPI(selectedAddressId, selectedPayment, lines.map(l => l.itemId));
-            clearCart();
+            const result = await checkoutAPI(
+            selectedAddressId,
+            selectedPayment,
+            lines.map(l => l.itemId)
+            );
+
+            if (result.paymentMethod === 'VNPAY' && result.paymentUrl) {
+            window.location.href = result.paymentUrl;
+            return;
+            }
+
+            await clearCart();
             message.success('Đặt hàng thành công!');
-            navigate(`/orders/${order.orderId}`);
+            navigate(`/orders/${result.orderId}`);
         } catch {
             message.error('Đặt hàng thất bại!');
         } finally {
             setLoading(false);
         }
-    };
+        };
 
     const columns = [
         {

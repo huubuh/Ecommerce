@@ -2,15 +2,18 @@ package iuh.fit.se.backend.controller;
 
 import iuh.fit.se.backend.dto.CartLineDto;
 import iuh.fit.se.backend.dto.CheckoutRequest;
+import iuh.fit.se.backend.dto.CheckoutResponse;
 import iuh.fit.se.backend.dto.OrderDetailDto;
 import iuh.fit.se.backend.service.DatabaseCartService;
 import iuh.fit.se.backend.service.OrderService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -26,7 +29,7 @@ public class CartController {
     @GetMapping
     public ResponseEntity<?> getCart(@AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(
-                databaseCartService.getAllCart(jwt.getSubject())
+                databaseCartService.getAllCart(requireSubject(jwt))
         );
     }
 
@@ -36,7 +39,7 @@ public class CartController {
             @RequestBody CartLineDto dto) {
 
         databaseCartService.addCartItem(
-                jwt.getSubject(),
+                requireSubject(jwt),
                 dto.getItemId(),
                 dto.getQty()
         );
@@ -50,7 +53,7 @@ public class CartController {
             @RequestParam int quantity) {
 
         databaseCartService.updateQuantity(
-                jwt.getSubject(),
+                requireSubject(jwt),
                 itemId,
                 quantity
         );
@@ -63,7 +66,7 @@ public class CartController {
             @PathVariable Long itemId) {
 
         databaseCartService.removeCartItem(
-                jwt.getSubject(),
+                requireSubject(jwt),
                 itemId
         );
         return ResponseEntity.noContent().build();
@@ -72,21 +75,46 @@ public class CartController {
     @DeleteMapping
     public ResponseEntity<Void> clearCart(@AuthenticationPrincipal Jwt jwt) {
 
-        databaseCartService.clearCart(jwt.getSubject());
+        databaseCartService.clearCart(requireSubject(jwt));
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/checkout")
-    public ResponseEntity<OrderDetailDto> checkout(
+    public ResponseEntity<?> checkout(
             @AuthenticationPrincipal Jwt jwt,
-            @RequestBody CheckoutRequest request) {
+            @RequestBody CheckoutRequest request,
+            HttpServletRequest httpRequest) {
 
-        // TODO: Sử dụng request.getPaymentMethod() để xử lý thanh toán
-        OrderDetailDto order = orderService.createOrder(
-                jwt.getSubject(),
-                request.getAddressId()
+        CheckoutResponse response = orderService.createOrder(
+                requireSubject(jwt),
+                request,
+                getClientIp(httpRequest)
         );
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(order);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    private String requireSubject(Jwt jwt) {
+        if (jwt == null || jwt.getSubject() == null || jwt.getSubject().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing or invalid JWT");
+        }
+        return jwt.getSubject();
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("Proxy-Client-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }

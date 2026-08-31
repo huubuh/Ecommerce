@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { message } from 'antd';
 import type { CartLineDto, ProductItemDto, ProductDetailDto } from '../types';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from './useAuth';
 import * as cartAPI from '../api/cartAPI';
 import * as sessionCartAPI from '../api/sessionCartAPI';
 
@@ -72,7 +72,12 @@ export default function useCart(): UseCartReturn {
     const updateQty = useCallback(
         async (itemId: number, quantity: number) => {
             if (quantity < 1) {
-                await removeItem(itemId);
+                if (user) {
+                    await cartAPI.removeItem(itemId);
+                } else {
+                    await sessionCartAPI.removeItem(itemId);
+                }
+                await loadCart();
                 return;
             }
 
@@ -97,7 +102,7 @@ export default function useCart(): UseCartReturn {
                 message.error('Không thể cập nhật số lượng!');
             }
         },
-        [user, lines]
+        [user, lines, loadCart]
     );
 
     const removeItem = useCallback(
