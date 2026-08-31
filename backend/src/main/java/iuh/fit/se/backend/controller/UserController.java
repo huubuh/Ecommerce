@@ -7,15 +7,16 @@ import iuh.fit.se.backend.model.User;
 import iuh.fit.se.backend.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -41,10 +42,21 @@ public class UserController {
 
     @PutMapping("/users/profile")
     public UserProfileDto updateProfile(@AuthenticationPrincipal Jwt jwt,
-                                        @RequestBody UserProfileDto profileDto) {
+            @RequestBody UserProfileDto profileDto) {
         return userService.updateUserProfile(jwt.getSubject(), profileDto);
     }
 
+    @PostMapping(value = "/users/profile/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public UserProfileDto uploadMyAvatar(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam("image") MultipartFile image
+    ) {
+        return userService.uploadMyAvatar(jwt.getSubject(), image);
+    }
+    @DeleteMapping("/users/profile/avatar")
+    public UserProfileDto deleteMyAvatar(@AuthenticationPrincipal Jwt jwt) {
+        return userService.deleteMyAvatar(jwt.getSubject());
+    }
     // Admin endpoints - thêm prefix /admin
     @GetMapping("/admin/users")
     @PreAuthorize("hasRole('ADMIN')")
@@ -62,6 +74,21 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public UserProfileDto updateUser(@PathVariable Long id, @RequestBody UserProfileDto userDto) {
         return userService.updateUserById(id, userDto);
+    }
+
+    @PostMapping(value = "/admin/users/{id}/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public UserProfileDto uploadUserAvatar(
+            @PathVariable Long id,
+            @RequestParam("image") MultipartFile image
+    ) {
+        return userService.uploadUserAvatarById(id, image);
+    }
+
+    @DeleteMapping("/admin/users/{id}/avatar")
+    @PreAuthorize("hasRole('ADMIN')")
+    public UserProfileDto deleteUserAvatar(@PathVariable Long id) {
+        return userService.deleteUserAvatarById(id);
     }
 
     @DeleteMapping("/admin/users/{id}")
